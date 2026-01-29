@@ -12,7 +12,7 @@ const ProductPage = () => {
     const fetchProduct = async () => {
       try {
         const response = await api.get(`/products/${slug}`);
-        setProduct(response.data);
+        setProduct(response.data.data.product);
       } catch (error) {
         console.error("Error fetching product:", error);
       } finally {

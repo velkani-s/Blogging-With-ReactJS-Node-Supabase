@@ -15,7 +15,7 @@ const BlogList = () => {
         const response = await api.get("/blog-posts", {
           params: { search },
         });
-        setBlogs(response.data);
+        setBlogs(response.data.data.posts || response.data.data || []);
       } catch (error) {
         console.error("Error fetching blogs:", error);
       } finally {
