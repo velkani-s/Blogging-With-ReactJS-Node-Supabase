@@ -6,7 +6,6 @@ const {
   updateProduct,
   deleteProduct,
   addReview,
-  getCategories,
   getFeaturedProducts,
 } = require("../controllers/productController");
 const { protect, authorize } = require("../middleware/auth");
@@ -19,9 +18,8 @@ const {
 const router = express.Router();
 
 // Public routes
-router.get("/", getProducts);
-router.get("/categories", getCategories);
 router.get("/featured", getFeaturedProducts);
+router.get("/", getProducts);
 router.get("/:id", getProduct);
 
 // Protected routes
@@ -29,7 +27,8 @@ router.post(
   "/",
   protect,
   authorize("admin"),
-  uploadProductImages.array("images", 10),
+  uploadProductImages,
+  handleUploadError,
   validateProduct,
   createProduct,
 );
@@ -37,7 +36,8 @@ router.put(
   "/:id",
   protect,
   authorize("admin"),
-  uploadProductImages.array("images", 10),
+  uploadProductImages,
+  handleUploadError,
   validateProduct,
   updateProduct,
 );

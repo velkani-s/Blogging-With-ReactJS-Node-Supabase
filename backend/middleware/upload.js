@@ -1,61 +1,44 @@
 const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const cloudinary = require("cloudinary").v2;
+const path = require("path");
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// Use memory storage for Supabase upload
+const memoryStorage = multer.memoryStorage();
 
-// Storage for blog post images
-const blogStorage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "blog/posts",
-    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
-    transformation: [{ width: 1200, height: 800, crop: "limit" }],
-  },
-});
-
-// Storage for product images
-const productStorage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "blog/products",
-    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
-    transformation: [{ width: 800, height: 800, crop: "limit" }],
-  },
-});
-
-// File filter
+// File filter for images
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith("image/")) {
+  const allowedMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+  if (allowedMimes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Only image files are allowed!"), false);
+    cb(new Error("Only image files (JPEG, PNG, GIF, WebP) are allowed!"), false);
   }
 };
 
-// Upload middleware for blog posts
-const uploadBlogImage = multer({
-  storage: blogStorage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB
-  },
-});
+// Multer options
+const limits = {
+  fileSize: 5 * 1024 * 1024, // 5MB max file size
+};
 
-// Upload middleware for products (multiple images)
-const uploadProductImages = multer({
-  storage: productStorage,
+// Middleware for blog post image upload
+const uploadBlogImage = multer({
+  storage: memoryStorage,
   fileFilter: fileFilter,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB per file
-    files: 10, // Maximum 10 files
-  },
-});
+  limits: limits,
+}).single("image");
+
+// Middleware for product images upload (multiple)
+const uploadProductImages = multer({
+  storage: memoryStorage,
+  fileFilter: fileFilter,
+  limits: limits,
+}).array("images", 5); // Max 5 images per product
+
+// Middleware for single product image
+const uploadProductImage = multer({
+  storage: memoryStorage,
+  fileFilter: fileFilter,
+  limits: limits,
+}).single("image");
 
 // Error handling middleware
 const handleUploadError = (error, req, res, next) => {
@@ -69,12 +52,12 @@ const handleUploadError = (error, req, res, next) => {
     if (error.code === "LIMIT_FILE_COUNT") {
       return res.status(400).json({
         success: false,
-        message: "Too many files. Maximum 10 files allowed.",
+        message: "Too many files. Maximum 5 files allowed.",
       });
     }
   }
 
-  if (error.message === "Only image files are allowed!") {
+  if (error.message.includes("Only image files")) {
     return res.status(400).json({
       success: false,
       message: error.message,
@@ -87,5 +70,6 @@ const handleUploadError = (error, req, res, next) => {
 module.exports = {
   uploadBlogImage,
   uploadProductImages,
+  uploadProductImage,
   handleUploadError,
 };

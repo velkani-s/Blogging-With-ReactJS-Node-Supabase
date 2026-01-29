@@ -28,7 +28,8 @@ router.post(
   "/",
   protect,
   authorize("admin"),
-  uploadBlogImage.single("featuredImage"),
+  uploadBlogImage,
+  handleUploadError,
   validateBlogPost,
   createBlogPost,
 );
@@ -36,7 +37,8 @@ router.put(
   "/:id",
   protect,
   authorize("admin"),
-  uploadBlogImage.single("featuredImage"),
+  uploadBlogImage,
+  handleUploadError,
   validateBlogPost,
   updateBlogPost,
 );

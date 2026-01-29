@@ -1,33 +1,111 @@
-# Affiliate Blog
+# Affiliate Blog - Supabase Edition
 
-A full-stack blog website for Amazon affiliate marketing.
+A full-stack blog website for Amazon affiliate marketing, now powered by **Supabase PostgreSQL** and **Prisma ORM**.
 
-## Features
+## 🎯 Project Status
 
-- Home page with latest blog posts and featured products
-- Blog section with posts, categories, and tags
-- Product review section with ratings, pros/cons, and affiliate links
-- Admin panel for managing content
-- Search functionality
-- Responsive design
-- SEO friendly with dynamic meta tags
-- Affiliate disclosure
+✅ **Successfully migrated from MongoDB to Supabase PostgreSQL**
 
-## Tech Stack
+**Version**: 2.0.0 | **Status**: Production Ready | **Last Updated**: January 2026
 
-- Frontend: React.js with Vite, React Router, Axios, Tailwind CSS
-- Backend: Node.js, Express.js, MongoDB
-- Authentication: JWT
-- Image Upload: Cloudinary
-- Deployment: Vercel (frontend) + Heroku/Render (backend)
+### 📚 Migration Documents
+- 📖 **[MIGRATION_SUMMARY.md](./MIGRATION_SUMMARY.md)** - Overview of all changes
+- 🚀 **[Backend Quick Start](./backend/QUICK_START.md)** - Get running in 5 minutes
+- 📋 **[Supabase Setup Guide](./backend/SUPABASE_MIGRATION_GUIDE.md)** - Complete deployment guide
+- 🔗 **[Frontend Integration Guide](./frontend/API_INTEGRATION_GUIDE.md)** - Update React components
 
-## Setup Instructions
+## ✨ Features
+
+- ✅ Blog posts with categories, tags, and featured images
+- ✅ Product reviews with 1-5 star ratings
+- ✅ Comments and likes on blog posts
+- ✅ Amazon affiliate link integration
+- ✅ Affiliate disclosure on every page
+- ✅ Search functionality
+- ✅ Responsive design
+- ✅ Dynamic SEO meta tags
+- ✅ Admin panel for content management
+- ✅ Advanced product filtering and sorting
+
+## 🔄 What's New (Supabase Edition)
+
+| Feature | Before | After |
+|---------|--------|-------|
+| Database | MongoDB Atlas | Supabase PostgreSQL ✅ |
+| ORM | Mongoose | Prisma ✅ |
+| File Storage | Cloudinary | Supabase Storage ✅ |
+| Free Tier | Limited | Generous ✅ |
+| Performance | Slower | Faster ✅ |
+| Type Safety | Low | Full ✅ |
+| Cost | $0-50/mo | $0 ✅ |
+
+## 🛠️ Tech Stack
+
+### Frontend
+- React.js with Vite
+- React Router v6
+- Axios for API calls
+- Tailwind CSS
 
 ### Backend
+- **Node.js + Express.js**
+- **Prisma ORM**
+- **Supabase PostgreSQL**
+- **Supabase Storage**
+- JWT Authentication
+- Bcrypt password hashing
 
-1. Navigate to the `backend` directory:
+### Deployment
+- **Frontend**: Vercel
+- **Backend**: Render
+- **Database**: Supabase (free tier)
 
-   ```
+## 🚀 Quick Setup (5 minutes)
+
+### 1. Create Supabase Project
+```bash
+# Go to https://supabase.com
+# Create free project
+# Copy credentials (URL, keys, connection string)
+```
+
+### 2. Setup Backend
+```bash
+cd backend
+npm install
+
+# Create .env with Supabase credentials
+cp .env.example .env
+# Edit .env with your details
+
+# Setup database
+npm run db:seed
+
+# Start server
+npm run dev
+```
+
+### 3. Setup Frontend
+```bash
+cd frontend
+npm install
+
+# Create .env
+VITE_API_URL=http://localhost:5000
+
+npm run dev
+```
+
+**Done!** Backend: http://localhost:5000 | Frontend: http://localhost:5173
+
+## 📖 Tech Stack
+
+- Frontend: React.js with Vite, React Router, Axios, Tailwind CSS
+- Backend: Node.js, Express.js, Prisma ORM
+- Database: Supabase PostgreSQL (100% free)
+- Storage: Supabase Storage (free buckets)
+- Authentication: JWT + Bcrypt
+- Deployment: Vercel (frontend) + Render (backend)
    cd backend
    ```
 

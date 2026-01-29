@@ -1,30 +1,65 @@
-const express = require("express");
-const multer = require("multer");
-const cloudinary = require("cloudinary").v2;
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const auth = require("../middleware/auth");
+netstat -ano | findstr :5000 | ForEach-Object { $parts = $_ -split '\s+'; taskkill /PID $parts[-1] /F } 2>$null; Start-Sleep -Seconds 2const express = require("express");
+
+const { protect } = require("../middleware/auth");
+const { uploadBlogImage, uploadProductImage, handleUploadError } = require("../middleware/upload");
+const { uploadFile, deleteFile } = require("../config/supabaseStorage");
 
 const router = express.Router();
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+// Blog image upload
+router.post("/blog", protect, uploadBlogImage, handleUploadError, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No image file provided",
+      });
+    }
+
+    const fileName = `blog-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${req.file.mimetype.split('/')[1]}`;
+    const publicUrl = await uploadFile(req.file, "blog-images", fileName);
+
+    res.json({
+      success: true,
+      imageUrl: publicUrl,
+      fileName: fileName,
+    });
+  } catch (error) {
+    console.error("Blog upload error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error uploading image",
+      error: error.message,
+    });
+  }
 });
 
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "blog-images",
-    allowed_formats: ["jpg", "png", "jpeg", "gif"],
-  },
-});
+// Product image upload
+router.post("/product", protect, uploadProductImage, handleUploadError, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No image file provided",
+      });
+    }
 
-const upload = multer({ storage: storage });
+    const fileName = `product-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${req.file.mimetype.split('/')[1]}`;
+    const publicUrl = await uploadFile(req.file, "product-images", fileName);
 
-router.post("/", auth, upload.single("image"), (req, res) => {
-  res.json({ imageUrl: req.file.path });
+    res.json({
+      success: true,
+      imageUrl: publicUrl,
+      fileName: fileName,
+    });
+  } catch (error) {
+    console.error("Product upload error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error uploading image",
+      error: error.message,
+    });
+  }
 });
 
 module.exports = router;

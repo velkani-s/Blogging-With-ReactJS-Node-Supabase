@@ -1,0 +1,242 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for admin authentication
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String   // bcrypt hashed
+  role      String   @default("admin") // "admin" or "user"
+  isActive  Boolean  @default(true)
+  
+  // Relations
+  posts     BlogPost[]
+  reviews   Review[]
+  comments  Comment[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([username])
+}
+
+// Category model
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  description String?
+  
+  // Relations
+  posts     BlogPost[]
+  products  Product[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+}
+
+// Tag model
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  
+  // Relations
+  posts     BlogPost[]
+  products  Product[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+}
+
+// Blog Post model
+model BlogPost {
+  id            String      @id @default(cuid())
+  title         String      @db.VarChar(100)
+  slug          String      @unique
+  content       String      @db.Text
+  excerpt       String?     @db.VarChar(300)
+  featuredImage String?     // Supabase Storage URL
+  status        String      @default("draft") // "draft", "published", "archived"
+  publishedAt   DateTime?
+  views         Int         @default(0)
+  
+  // Relations
+  author        User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId      String
+  category      Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId    String?
+  tags          Tag[]
+  comments      Comment[]
+  likes         Like[]
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([slug])
+  @@index([categoryId])
+  @@index([authorId])
+  @@index([status])
+}
+
+// Comment model for blog posts
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   @db.VarChar(500)
+  
+  // Relations
+  post      BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postId])
+  @@index([userId])
+}
+
+// Like model for blog posts
+model Like {
+  id        String   @id @default(cuid())
+  
+  // Relations
+  post      BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  
+  createdAt DateTime @default(now())
+
+  @@unique([postId])
+  @@index([postId])
+}
+
+// Product model
+model Product {
+  id              String        @id @default(cuid())
+  name            String        @db.VarChar(100)
+  slug            String        @unique
+  description     String        @db.VarChar(1000)
+  price           Float
+  originalPrice   Float?
+  brand           String?
+  status          String        @default("active") // "active", "inactive", "discontinued"
+  featured        Boolean       @default(false)
+  
+  // Inventory
+  quantity        Int           @default(0)
+  sku             String?       @unique
+  trackInventory  Boolean       @default(true)
+  weight          Float?
+  
+  // SEO
+  metaTitle       String?       @db.VarChar(60)
+  metaDescription String?       @db.VarChar(160)
+  
+  // Ratings
+  averageRating   Float         @default(0)
+  reviewCount     Int           @default(0)
+  
+  // Affiliate
+  amazonLink      String?       // Amazon affiliate link
+  affiliateNote   String?       // Affiliate disclosure
+  
+  // Relations
+  category        Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId      String?
+  tags            Tag[]
+  images          ProductImage[]
+  attributes      ProductAttribute[]
+  variants        ProductVariant[]
+  reviews         Review[]
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([slug])
+  @@index([categoryId])
+  @@index([status])
+  @@index([featured])
+}
+
+// Product Image model
+model ProductImage {
+  id        String   @id @default(cuid())
+  url       String   // Supabase Storage URL
+  alt       String?
+  
+  // Relations
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+  
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+// Product Attribute model
+model ProductAttribute {
+  id        String   @id @default(cuid())
+  name      String
+  value     String
+  
+  // Relations
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+  
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+// Product Variant model
+model ProductVariant {
+  id            String   @id @default(cuid())
+  name          String
+  value         String
+  priceModifier Float    @default(0)
+  inventory     Int      @default(0)
+  
+  // Relations
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId     String
+  
+  createdAt     DateTime @default(now())
+
+  @@index([productId])
+}
+
+// Review model for products
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      // 1-5 stars
+  comment   String?  @db.VarChar(500)
+  
+  // Relations
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId    String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@index([userId])
+}

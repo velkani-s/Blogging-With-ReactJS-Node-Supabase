@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const bcrypt = require("bcryptjs");
+const prisma = require("../config/prisma");
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -8,40 +9,48 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Register user
+// @desc    Register user (admin only)
 // @route   POST /api/auth/register
-// @access  Public
+// @access  Private (admin only)
 const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
     // Check if user exists
-    const userExists = await User.findOne({
-      $or: [{ email }, { username }],
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ email }, { username }],
+      },
     });
 
-    if (userExists) {
+    if (existingUser) {
       return res.status(400).json({
         success: false,
         message: "User already exists with this email or username",
       });
     }
 
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12);
+
     // Create user
-    const user = await User.create({
-      username,
-      email,
-      password,
+    const user = await prisma.user.create({
+      data: {
+        username,
+        email,
+        password: hashedPassword,
+        role: "admin",
+      },
     });
 
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken(user.id);
 
     res.status(201).json({
       success: true,
       data: {
         user: {
-          id: user._id,
+          id: user.id,
           username: user.username,
           email: user.email,
           role: user.role,
@@ -66,9 +75,21 @@ const login = async (req, res) => {
     const { email, password } = req.body;
 
     // Check for user
-    const user = await User.findOne({ email }).select("+password");
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
 
-    if (!user || !(await user.comparePassword(password))) {
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    // Compare password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
@@ -84,13 +105,13 @@ const login = async (req, res) => {
     }
 
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken(user.id);
 
     res.json({
       success: true,
       data: {
         user: {
-          id: user._id,
+          id: user.id,
           username: user.username,
           email: user.email,
           role: user.role,
@@ -107,25 +128,33 @@ const login = async (req, res) => {
   }
 };
 
-// @desc    Get current logged in user
+// @desc    Get current user profile
 // @route   GET /api/auth/me
 // @access  Private
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
 
     res.json({
       success: true,
-      data: {
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          isActive: user.isActive,
-          createdAt: user.createdAt,
-        },
-      },
+      data: { user },
     });
   } catch (error) {
     res.status(500).json({
@@ -141,81 +170,39 @@ const getMe = async (req, res) => {
 // @access  Private
 const updateProfile = async (req, res) => {
   try {
-    const { username, email } = req.body;
-
+    const { username, email, password } = req.body;
     const updateData = {};
+
     if (username) updateData.username = username;
     if (email) updateData.email = email;
-
-    // Check if username or email already exists
-    if (username || email) {
-      const existingUser = await User.findOne({
-        $or: [
-          username ? { username, _id: { $ne: req.user.id } } : {},
-          email ? { email, _id: { $ne: req.user.id } } : {},
-        ].filter((obj) => Object.keys(obj).length > 0),
-      });
-
-      if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          message: "Username or email already taken",
-        });
-      }
+    if (password) {
+      updateData.password = await bcrypt.hash(password, 12);
     }
 
-    const user = await User.findByIdAndUpdate(req.user.id, updateData, {
-      new: true,
-      runValidators: true,
-    });
-
-    res.json({
-      success: true,
-      data: {
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-        },
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: updateData,
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        isActive: true,
       },
     });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
-    });
-  }
-};
-
-// @desc    Change password
-// @route   PUT /api/auth/change-password
-// @access  Private
-const changePassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-
-    // Get user with password
-    const user = await User.findById(req.user.id).select("+password");
-
-    // Check current password
-    if (!(await user.comparePassword(currentPassword))) {
-      return res.status(400).json({
-        success: false,
-        message: "Current password is incorrect",
-      });
-    }
-
-    // Update password
-    user.password = newPassword;
-    await user.save();
 
     res.json({
       success: true,
-      message: "Password changed successfully",
+      data: { user },
     });
   } catch (error) {
+    if (error.code === "P2002") {
+      return res.status(400).json({
+        success: false,
+        message: "Username or email already exists",
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -229,5 +216,4 @@ module.exports = {
   login,
   getMe,
   updateProfile,
-  changePassword,
 };

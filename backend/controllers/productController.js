@@ -1,4 +1,5 @@
-const Product = require("../models/Product");
+const prisma = require("../config/prisma");
+const { deleteFile, getFilePathFromUrl } = require("../config/supabaseStorage");
 
 // @desc    Get all products
 // @route   GET /api/products
@@ -9,60 +10,75 @@ const getProducts = async (req, res) => {
     const limit = parseInt(req.query.limit) || 12;
     const skip = (page - 1) * limit;
 
-    // Build query
-   let query = {
-  $or: [
-    { status: "active" },
-    { status: { $exists: false } },
-  ],
-};
-
+    // Build where conditions
+    let where = {
+      status: "active",
+    };
 
     // Search functionality
     if (req.query.search) {
-      query.$text = { $search: req.query.search };
+      where.OR = [
+        { name: { contains: req.query.search, mode: "insensitive" } },
+        { description: { contains: req.query.search, mode: "insensitive" } },
+      ];
     }
 
     // Filter by category
     if (req.query.category) {
-      query.category = req.query.category;
-    }
-
-    // Filter by subcategory
-    if (req.query.subcategory) {
-      query.subcategory = req.query.subcategory;
+      where.category = {
+        slug: req.query.category,
+      };
     }
 
     // Price range filter
     if (req.query.minPrice || req.query.maxPrice) {
-      query.price = {};
-      if (req.query.minPrice) query.price.$gte = parseFloat(req.query.minPrice);
-      if (req.query.maxPrice) query.price.$lte = parseFloat(req.query.maxPrice);
+      where.price = {};
+      if (req.query.minPrice)
+        where.price.gte = parseFloat(req.query.minPrice);
+      if (req.query.maxPrice)
+        where.price.lte = parseFloat(req.query.maxPrice);
     }
 
     // Featured products
     if (req.query.featured === "true") {
-      query.featured = true;
+      where.featured = true;
+    }
+
+    // Rating filter
+    if (req.query.minRating) {
+      where.averageRating = {
+        gte: parseFloat(req.query.minRating),
+      };
     }
 
     // Sort options
-    let sort = { createdAt: -1 };
+    let orderBy = { createdAt: "desc" };
     if (req.query.sort === "price_asc") {
-      sort = { price: 1 };
+      orderBy = { price: "asc" };
     } else if (req.query.sort === "price_desc") {
-      sort = { price: -1 };
+      orderBy = { price: "desc" };
     } else if (req.query.sort === "rating") {
-      sort = { averageRating: -1 };
+      orderBy = { averageRating: "desc" };
     } else if (req.query.sort === "name") {
-      sort = { name: 1 };
+      orderBy = { name: "asc" };
     }
 
-    const products = await Product.find(query)
-      .sort(sort)
-      .skip(skip)
-      .limit(limit);
+    const products = await prisma.product.findMany({
+      where,
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        tags: { select: { id: true, name: true, slug: true } },
+        images: true,
+        _count: {
+          select: { reviews: true },
+        },
+      },
+      orderBy,
+      skip,
+      take: limit,
+    });
 
-    const total = await Product.countDocuments(query);
+    const total = await prisma.product.count({ where });
 
     res.json({
       success: true,
@@ -86,11 +102,27 @@ const getProducts = async (req, res) => {
 };
 
 // @desc    Get single product
-// @route   GET /api/products/:id
+// @route   GET /api/products/:slug
 // @access  Public
 const getProduct = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await prisma.product.findUnique({
+      where: { slug: req.params.slug },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        tags: { select: { id: true, name: true, slug: true } },
+        images: true,
+        attributes: true,
+        variants: true,
+        reviews: {
+          include: { user: { select: { id: true, username: true } } },
+          orderBy: { createdAt: "desc" },
+        },
+        _count: {
+          select: { reviews: true },
+        },
+      },
+    });
 
     if (!product) {
       return res.status(404).json({
@@ -117,43 +149,88 @@ const getProduct = async (req, res) => {
 // @access  Private (Admin)
 const createProduct = async (req, res) => {
   try {
-    const productData = { ...req.body };
+    const {
+      name,
+      description,
+      price,
+      originalPrice,
+      brand,
+      categoryId,
+      tagIds,
+      quantity,
+      sku,
+      metaTitle,
+      metaDescription,
+      amazonLink,
+      affiliateNote,
+    } = req.body;
 
-    // Handle multiple image uploads
-    if (req.files && req.files.length > 0) {
-      productData.images = req.files.map((file) => ({
-        public_id: file.filename,
-        url: file.path,
-        alt: file.originalname,
-      }));
+    // Generate slug
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, "")
+      .replace(/\s+/g, "-")
+      .trim("-");
+
+    const product = await prisma.product.create({
+      data: {
+        name,
+        slug,
+        description,
+        price: parseFloat(price),
+        originalPrice: originalPrice ? parseFloat(originalPrice) : null,
+        brand,
+        quantity: parseInt(quantity) || 0,
+        sku,
+        metaTitle,
+        metaDescription,
+        amazonLink,
+        affiliateNote,
+        categoryId: categoryId || null,
+      },
+      include: {
+        category: true,
+        tags: true,
+        images: true,
+      },
+    });
+
+    // Connect tags if provided
+    if (tagIds && Array.isArray(tagIds)) {
+      await prisma.product.update({
+        where: { id: product.id },
+        data: {
+          tags: {
+            connect: tagIds.map((id) => ({ id })),
+          },
+        },
+      });
     }
 
-    // Parse arrays from strings if needed
-    if (typeof productData.tags === "string") {
-      productData.tags = productData.tags.split(",").map((tag) => tag.trim());
-    }
-
-    if (typeof productData.attributes === "string") {
-      try {
-        productData.attributes = JSON.parse(productData.attributes);
-      } catch (e) {
-        productData.attributes = [];
+    // Add images if provided
+    if (req.files && Array.isArray(req.files)) {
+      for (const file of req.files) {
+        await prisma.productImage.create({
+          data: {
+            url: file.path,
+            productId: product.id,
+          },
+        });
       }
     }
 
-    if (typeof productData.variants === "string") {
-      try {
-        productData.variants = JSON.parse(productData.variants);
-      } catch (e) {
-        productData.variants = [];
-      }
-    }
-
-    const product = await Product.create(productData);
+    const createdProduct = await prisma.product.findUnique({
+      where: { id: product.id },
+      include: {
+        category: true,
+        tags: true,
+        images: true,
+      },
+    });
 
     res.status(201).json({
       success: true,
-      data: { product },
+      data: { product: createdProduct },
     });
   } catch (error) {
     res.status(500).json({
@@ -169,7 +246,9 @@ const createProduct = async (req, res) => {
 // @access  Private (Admin)
 const updateProduct = async (req, res) => {
   try {
-    let product = await Product.findById(req.params.id);
+    const product = await prisma.product.findUnique({
+      where: { id: req.params.id },
+    });
 
     if (!product) {
       return res.status(404).json({
@@ -178,49 +257,86 @@ const updateProduct = async (req, res) => {
       });
     }
 
-    const updateData = { ...req.body };
+    const {
+      name,
+      description,
+      price,
+      originalPrice,
+      brand,
+      categoryId,
+      tagIds,
+      quantity,
+      sku,
+      status,
+      featured,
+      metaTitle,
+      metaDescription,
+      amazonLink,
+      affiliateNote,
+    } = req.body;
 
-    // Handle new image uploads
-    if (req.files && req.files.length > 0) {
-      const newImages = req.files.map((file) => ({
-        public_id: file.filename,
-        url: file.path,
-        alt: file.originalname,
-      }));
-
-      // Append new images to existing ones
-      updateData.images = [...(product.images || []), ...newImages];
+    const updateData = {};
+    if (name) {
+      updateData.name = name;
+      updateData.slug = name
+        .toLowerCase()
+        .replace(/[^a-z0-9 ]/g, "")
+        .replace(/\s+/g, "-")
+        .trim("-");
     }
+    if (description) updateData.description = description;
+    if (price) updateData.price = parseFloat(price);
+    if (originalPrice) updateData.originalPrice = parseFloat(originalPrice);
+    if (brand !== undefined) updateData.brand = brand;
+    if (quantity !== undefined) updateData.quantity = parseInt(quantity);
+    if (sku !== undefined) updateData.sku = sku;
+    if (status !== undefined) updateData.status = status;
+    if (featured !== undefined) updateData.featured = featured;
+    if (metaTitle !== undefined) updateData.metaTitle = metaTitle;
+    if (metaDescription !== undefined)
+      updateData.metaDescription = metaDescription;
+    if (amazonLink !== undefined) updateData.amazonLink = amazonLink;
+    if (affiliateNote !== undefined) updateData.affiliateNote = affiliateNote;
 
-    // Parse arrays from strings if needed
-    if (typeof updateData.tags === "string") {
-      updateData.tags = updateData.tags.split(",").map((tag) => tag.trim());
-    }
+    if (categoryId !== undefined) updateData.categoryId = categoryId;
 
-    if (typeof updateData.attributes === "string") {
-      try {
-        updateData.attributes = JSON.parse(updateData.attributes);
-      } catch (e) {
-        // Keep existing attributes if parsing fails
-      }
-    }
-
-    if (typeof updateData.variants === "string") {
-      try {
-        updateData.variants = JSON.parse(updateData.variants);
-      } catch (e) {
-        // Keep existing variants if parsing fails
-      }
-    }
-
-    product = await Product.findByIdAndUpdate(req.params.id, updateData, {
-      new: true,
-      runValidators: true,
+    const updatedProduct = await prisma.product.update({
+      where: { id: req.params.id },
+      data: updateData,
+      include: {
+        category: true,
+        tags: true,
+        images: true,
+      },
     });
+
+    // Update tags if provided
+    if (tagIds && Array.isArray(tagIds)) {
+      await prisma.product.update({
+        where: { id: req.params.id },
+        data: {
+          tags: {
+            set: tagIds.map((id) => ({ id })),
+          },
+        },
+      });
+    }
+
+    // Add new images if provided
+    if (req.files && Array.isArray(req.files)) {
+      for (const file of req.files) {
+        await prisma.productImage.create({
+          data: {
+            url: file.path,
+            productId: req.params.id,
+          },
+        });
+      }
+    }
 
     res.json({
       success: true,
-      data: { product },
+      data: { product: updatedProduct },
     });
   } catch (error) {
     res.status(500).json({
@@ -236,7 +352,10 @@ const updateProduct = async (req, res) => {
 // @access  Private (Admin)
 const deleteProduct = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await prisma.product.findUnique({
+      where: { id: req.params.id },
+      include: { images: true },
+    });
 
     if (!product) {
       return res.status(404).json({
@@ -245,11 +364,60 @@ const deleteProduct = async (req, res) => {
       });
     }
 
-    await Product.findByIdAndDelete(req.params.id);
+    // Delete all images
+    for (const image of product.images) {
+      const filePath = getFilePathFromUrl(image.url);
+      if (filePath) {
+        await deleteFile(filePath, "product-images").catch(() => {});
+      }
+    }
+
+    await prisma.product.delete({
+      where: { id: req.params.id },
+    });
 
     res.json({
       success: true,
       message: "Product deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+// @desc    Delete product image
+// @route   DELETE /api/products/:id/images/:imageId
+// @access  Private (Admin)
+const deleteProductImage = async (req, res) => {
+  try {
+    const image = await prisma.productImage.findUnique({
+      where: { id: req.params.imageId },
+    });
+
+    if (!image) {
+      return res.status(404).json({
+        success: false,
+        message: "Image not found",
+      });
+    }
+
+    // Delete from storage
+    const filePath = getFilePathFromUrl(image.url);
+    if (filePath) {
+      await deleteFile(filePath, "product-images").catch(() => {});
+    }
+
+    await prisma.productImage.delete({
+      where: { id: req.params.imageId },
+    });
+
+    res.json({
+      success: true,
+      message: "Image deleted successfully",
     });
   } catch (error) {
     res.status(500).json({
@@ -265,7 +433,11 @@ const deleteProduct = async (req, res) => {
 // @access  Private
 const addReview = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const { rating, comment } = req.body;
+
+    const product = await prisma.product.findUnique({
+      where: { id: req.params.id },
+    });
 
     if (!product) {
       return res.status(404).json({
@@ -274,35 +446,37 @@ const addReview = async (req, res) => {
       });
     }
 
-    const { rating, comment } = req.body;
+    const review = await prisma.review.create({
+      data: {
+        rating: parseInt(rating),
+        comment,
+        productId: req.params.id,
+        userId: req.user?.id || null,
+      },
+      include: {
+        user: { select: { id: true, username: true } },
+      },
+    });
 
-    // Check if user already reviewed this product
-    const existingReview = product.reviews.find(
-      (review) => review.user.toString() === req.user.id,
-    );
+    // Recalculate average rating
+    const reviews = await prisma.review.findMany({
+      where: { productId: req.params.id },
+    });
 
-    if (existingReview) {
-      return res.status(400).json({
-        success: false,
-        message: "You have already reviewed this product",
-      });
-    }
+    const avgRating =
+      reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
 
-    const review = {
-      user: req.user.id,
-      rating: parseInt(rating),
-      comment,
-    };
-
-    product.reviews.push(review);
-    product.calculateAverageRating();
-    await product.save();
-
-    await product.populate("reviews.user", "username");
+    await prisma.product.update({
+      where: { id: req.params.id },
+      data: {
+        averageRating: Math.round(avgRating * 10) / 10,
+        reviewCount: reviews.length,
+      },
+    });
 
     res.status(201).json({
       success: true,
-      data: { review: product.reviews[product.reviews.length - 1] },
+      data: { review },
     });
   } catch (error) {
     res.status(500).json({
@@ -313,19 +487,40 @@ const addReview = async (req, res) => {
   }
 };
 
-// @desc    Get product categories
-// @route   GET /api/products/categories
+// @desc    Get product reviews
+// @route   GET /api/products/:id/reviews
 // @access  Public
-const getCategories = async (req, res) => {
+const getReviews = async (req, res) => {
   try {
-    const categories = await Product.distinct("category", { status: "active" });
-    const subcategories = await Product.distinct("subcategory", {
-      status: "active",
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const reviews = await prisma.review.findMany({
+      where: { productId: req.params.id },
+      include: {
+        user: { select: { id: true, username: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    });
+
+    const total = await prisma.review.count({
+      where: { productId: req.params.id },
     });
 
     res.json({
       success: true,
-      data: { categories, subcategories },
+      data: {
+        reviews,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -343,9 +538,19 @@ const getFeaturedProducts = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 8;
 
-    const products = await Product.find({ featured: true, status: "active" })
-      .sort({ createdAt: -1 })
-      .limit(limit);
+    const products = await prisma.product.findMany({
+      where: {
+        featured: true,
+        status: "active",
+      },
+      include: {
+        category: true,
+        tags: true,
+        images: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
 
     res.json({
       success: true,
@@ -366,7 +571,8 @@ module.exports = {
   createProduct,
   updateProduct,
   deleteProduct,
+  deleteProductImage,
   addReview,
-  getCategories,
+  getReviews,
   getFeaturedProducts,
 };

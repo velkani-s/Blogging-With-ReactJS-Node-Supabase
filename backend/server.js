@@ -7,9 +7,8 @@ const dotenv = require("dotenv");
 // Load environment variables
 dotenv.config();
 
-// Connect to database
-const connectDB = require("./config/database");
-connectDB();
+// Initialize Prisma
+const prisma = require("./config/prisma");
 
 // Import routes
 const authRoutes = require("./routes/auth");
@@ -79,22 +78,27 @@ app.use("*", (req, res) => {
 app.use((err, req, res, next) => {
   console.error(err.stack);
 
-  // Mongoose validation error
-  if (err.name === "ValidationError") {
-    const errors = Object.values(err.errors).map((val) => val.message);
+  // Prisma validation error
+  if (err.code === "P1000") {
     return res.status(400).json({
       success: false,
-      message: "Validation Error",
-      errors,
+      message: "Authentication failed against database server",
     });
   }
 
-  // Mongoose duplicate key error
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyValue)[0];
+  // Prisma unique constraint error
+  if (err.code === "P2002") {
     return res.status(400).json({
       success: false,
-      message: `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`,
+      message: `${err.meta?.target?.[0] || "Field"} already exists`,
+    });
+  }
+
+  // Prisma not found error
+  if (err.code === "P2025") {
+    return res.status(404).json({
+      success: false,
+      message: "Record not found",
     });
   }
 
@@ -145,6 +149,13 @@ process.on("uncaughtException", (err) => {
   console.log(`Error: ${err.message}`);
   console.log("Shutting down the server due to Uncaught Exception");
   process.exit(1);
+});
+
+// Graceful shutdown
+process.on("SIGINT", async () => {
+  console.log("Shutting down gracefully...");
+  await prisma.$disconnect();
+  process.exit(0);
 });
 
 module.exports = app;
