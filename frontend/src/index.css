@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Additional styles */
+body {
+  font-family: "Georgia", serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Georgia", serif;
+}
