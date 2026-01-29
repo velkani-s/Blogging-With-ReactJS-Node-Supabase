@@ -29,10 +29,11 @@ const AdminProducts = () => {
   const fetchProducts = async () => {
     try {
       const response = await api.get("/products?limit=100");
+      console.log("Products response:", response.data);
       setProducts(response.data.data.products || []);
     } catch (error) {
       console.error("Error fetching products:", error);
-      alert("Failed to fetch products");
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -124,10 +125,10 @@ const AdminProducts = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, slug) => {
     if (window.confirm("Are you sure you want to delete this product?")) {
       try {
-        await api.delete(`/products/${id}`);
+        await api.delete(`/products/${slug}`);
         alert("Product deleted successfully!");
         fetchProducts();
       } catch (error) {
@@ -413,7 +414,7 @@ const AdminProducts = () => {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(product.id)}
+                        onClick={() => handleDelete(product.id, product.slug)}
                         className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
                       >
                         Delete

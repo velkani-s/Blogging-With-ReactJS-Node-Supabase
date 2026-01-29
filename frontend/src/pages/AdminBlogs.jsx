@@ -25,10 +25,11 @@ const AdminBlogs = () => {
   const fetchBlogs = async () => {
     try {
       const response = await api.get("/blog-posts?limit=100");
+      console.log("Blog response:", response.data);
       setBlogs(response.data.data.posts || []);
     } catch (error) {
       console.error("Error fetching blogs:", error);
-      alert("Failed to fetch blogs");
+      setBlogs([]);
     } finally {
       setLoading(false);
     }
@@ -107,10 +108,10 @@ const AdminBlogs = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, slug) => {
     if (window.confirm("Are you sure you want to delete this blog post?")) {
       try {
-        await api.delete(`/blog-posts/${id}`);
+        await api.delete(`/blog-posts/${slug}`);
         alert("Blog deleted successfully!");
         fetchBlogs();
       } catch (error) {
@@ -313,7 +314,7 @@ const AdminBlogs = () => {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(blog.slug)}
+                        onClick={() => handleDelete(blog.id, blog.slug)}
                         className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
                       >
                         Delete
