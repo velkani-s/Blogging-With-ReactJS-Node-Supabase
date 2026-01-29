@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import axios from "axios";
+import api from "../utils/api";
 
 const BlogList = () => {
   const [blogs, setBlogs] = useState([]);
@@ -12,7 +12,7 @@ const BlogList = () => {
   useEffect(() => {
     const fetchBlogs = async () => {
       try {
-        const response = await axios.get("/api/blogPosts", {
+        const response = await api.get("/blog-posts", {
           params: { search },
         });
         setBlogs(response.data);
@@ -52,13 +52,13 @@ const BlogList = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {blogs.map((blog) => (
             <article
-              key={blog._id}
+              key={blog.id}
               className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow"
             >
               <div className="p-6">
                 <h2 className="text-xl font-semibold text-gray-900 font-serif mb-3">
                   <Link
-                    to={`/blogs/${blog._id}`}
+                    to={`/blogs/${blog.slug}`}
                     className="text-blue-600 hover:text-blue-800 hover:underline"
                   >
                     {blog.title}
@@ -68,10 +68,10 @@ const BlogList = () => {
                   {new Date(blog.createdAt).toLocaleDateString()}
                 </p>
                 <p className="text-gray-700 line-clamp-3">
-                  {blog.content.substring(0, 150)}...
+                  {blog.excerpt || blog.content.substring(0, 150)}...
                 </p>
                 <Link
-                  to={`/blogs/${blog._id}`}
+                  to={`/blogs/${blog.slug}`}
                   className="inline-block mt-4 text-blue-600 hover:text-blue-800 font-medium"
                 >
                   Read More →

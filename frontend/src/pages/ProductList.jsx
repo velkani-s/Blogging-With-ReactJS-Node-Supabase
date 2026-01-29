@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import axios from "axios";
+import api from "../utils/api";
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
@@ -10,9 +10,8 @@ const ProductList = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await axios.get("/api/products");
-        //console.log(response.data.data.products);
-        setProducts(response.data.data.products);
+        const response = await api.get("/products");
+        setProducts(response.data);
       } catch (error) {
         console.error("Error fetching products:", error);
       } finally {
@@ -43,13 +42,13 @@ const ProductList = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {products.map((product) =>(
             <div
-              key={product._id}
+              key={product.id}
               className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow"
             >
               <div className="p-6">
                 <h2 className="text-xl font-semibold text-gray-900 font-serif mb-3">
                   <Link
-                    to={`/products/${product._id}`}
+                    to={`/products/${product.slug}`}
                     className="text-blue-600 hover:text-blue-800 hover:underline"
                   >
                     {product.name}
@@ -60,7 +59,7 @@ const ProductList = () => {
                   {product.description}
                 </p>
                 <Link
-                  to={`/products/${product._id}`}
+                  to={`/products/${product.slug}`}
                   className="inline-block mt-4 text-blue-600 hover:text-blue-800 font-medium"
                 >
                   View Details →

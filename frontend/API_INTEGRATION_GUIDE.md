@@ -4,14 +4,14 @@ Your React frontend needs minimal changes to work with the Supabase backend. Fol
 
 ## 🔄 Key Changes from MongoDB to Supabase
 
-| Aspect | Before | After |
-|--------|--------|-------|
-| Database | MongoDB documents | PostgreSQL tables |
-| IDs | ObjectId (24-char) | CUID (random string) |
-| Routes | `/blog-posts/:id` | `/blog-posts/:slug` |
-| Product Routes | `/products/:id` | `/products/:slug` |
-| Image Upload | Cloudinary URLs | Supabase Storage URLs |
-| Auth | Same JWT flow | Same JWT flow ✅ |
+| Aspect         | Before             | After                 |
+| -------------- | ------------------ | --------------------- |
+| Database       | MongoDB documents  | PostgreSQL tables     |
+| IDs            | ObjectId (24-char) | CUID (random string)  |
+| Routes         | `/blog-posts/:id`  | `/blog-posts/:slug`   |
+| Product Routes | `/products/:id`    | `/products/:slug`     |
+| Image Upload   | Cloudinary URLs    | Supabase Storage URLs |
+| Auth           | Same JWT flow      | Same JWT flow ✅      |
 
 ## ⚙️ Environment Configuration
 
@@ -25,9 +25,9 @@ VITE_API_URL_PROD=https://your-render-backend.onrender.com
 ### Update `frontend/src/utils/api.js`
 
 ```javascript
-import axios from 'axios';
+import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
@@ -35,7 +35,7 @@ const api = axios.create({
 
 // Add token to requests
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -51,22 +51,22 @@ export default api;
 
 ```javascript
 // frontend/src/pages/LoginPage.jsx
-import api from '../utils/api';
+import api from "../utils/api";
 
 const handleLogin = async (email, password) => {
   try {
-    const { data } = await api.post('/auth/login', {
+    const { data } = await api.post("/auth/login", {
       email,
       password,
     });
-    
-    localStorage.setItem('token', data.data.token);
-    localStorage.setItem('user', JSON.stringify(data.data.user));
-    
+
+    localStorage.setItem("token", data.data.token);
+    localStorage.setItem("user", JSON.stringify(data.data.user));
+
     // Redirect to admin panel
-    navigate('/admin');
+    navigate("/admin");
   } catch (error) {
-    console.error('Login failed:', error.response?.data?.message);
+    console.error("Login failed:", error.response?.data?.message);
   }
 };
 ```
@@ -75,8 +75,8 @@ const handleLogin = async (email, password) => {
 
 ```javascript
 // frontend/src/utils/useAuth.js
-import { useEffect, useState } from 'react';
-import api from './api';
+import { useEffect, useState } from "react";
+import api from "./api";
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
@@ -85,16 +85,16 @@ export const useAuth = () => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const { data } = await api.get('/auth/me');
+        const { data } = await api.get("/auth/me");
         setUser(data.data.user);
       } catch (error) {
-        console.error('Failed to fetch user');
+        console.error("Failed to fetch user");
       } finally {
         setLoading(false);
       }
     };
 
-    if (localStorage.getItem('token')) {
+    if (localStorage.getItem("token")) {
       fetchUser();
     } else {
       setLoading(false);
@@ -121,21 +121,21 @@ GET /api/blog-posts/top-5-tech-gadgets-2025
 
 ```javascript
 // frontend/src/pages/BlogList.jsx
-import api from '../utils/api';
+import api from "../utils/api";
 
 const getBlogPosts = async (page = 1) => {
-  const { data } = await api.get('/blog-posts', {
+  const { data } = await api.get("/blog-posts", {
     params: {
       page,
       limit: 10,
-      status: 'published',
-      sort: 'latest', // or 'popular', 'oldest'
-      search: 'keyword', // optional
-      category: 'technology', // optional - use slug
-      tag: 'bestseller', // optional - use slug
+      status: "published",
+      sort: "latest", // or 'popular', 'oldest'
+      search: "keyword", // optional
+      category: "technology", // optional - use slug
+      tag: "bestseller", // optional - use slug
     },
   });
-  
+
   return {
     posts: data.data.posts,
     pagination: data.data.pagination,
@@ -147,8 +147,8 @@ const getBlogPosts = async (page = 1) => {
 
 ```javascript
 // frontend/src/pages/BlogPost.jsx
-import { useParams } from 'react-router-dom';
-import api from '../utils/api';
+import { useParams } from "react-router-dom";
+import api from "../utils/api";
 
 const BlogPost = () => {
   const { slug } = useParams(); // Get from URL
@@ -161,7 +161,7 @@ const BlogPost = () => {
         const { data } = await api.get(`/blog-posts/${slug}`);
         setPost(data.data.post);
       } catch (error) {
-        console.error('Post not found');
+        console.error("Post not found");
       }
     };
 
@@ -177,13 +177,13 @@ const BlogPost = () => {
 ```javascript
 // frontend/src/pages/AdminPanel.jsx
 const createPost = async (formData) => {
-  const { data } = await api.post('/blog-posts', {
-    title: 'My Post Title',
-    content: '<p>Post content</p>',
-    excerpt: 'Short description',
-    categoryId: 'cat_xyz123', // Use category ID, not name
-    tagIds: ['tag_1', 'tag_2'], // Array of tag IDs
-    status: 'draft', // or 'published'
+  const { data } = await api.post("/blog-posts", {
+    title: "My Post Title",
+    content: "<p>Post content</p>",
+    excerpt: "Short description",
+    categoryId: "cat_xyz123", // Use category ID, not name
+    tagIds: ["tag_1", "tag_2"], // Array of tag IDs
+    status: "draft", // or 'published'
   });
 
   return data.data.post;
@@ -196,17 +196,17 @@ const createPost = async (formData) => {
 
 ```javascript
 // Get Single Product - BY SLUG
-const { data } = await api.get('/products/smart-home-hub-pro');
+const { data } = await api.get("/products/smart-home-hub-pro");
 
 // Product URL structure
-<Link to={`/products/${product.slug}`}>{product.name}</Link>
+<Link to={`/products/${product.slug}`}>{product.name}</Link>;
 ```
 
 ### Get All Products
 
 ```javascript
 const getProducts = async (filters = {}) => {
-  const { data } = await api.get('/products', {
+  const { data } = await api.get("/products", {
     params: {
       page: filters.page || 1,
       limit: filters.limit || 12,
@@ -230,7 +230,7 @@ const getProducts = async (filters = {}) => {
 ### Get Featured Products
 
 ```javascript
-const { data } = await api.get('/products/featured?limit=8');
+const { data } = await api.get("/products/featured?limit=8");
 const products = data.data.products;
 ```
 
@@ -251,7 +251,7 @@ const getReviews = async (productId, page = 1) => {
   const { data } = await api.get(`/products/${productId}/reviews`, {
     params: { page, limit: 10 },
   });
-  
+
   return {
     reviews: data.data.reviews,
     pagination: data.data.pagination,
@@ -266,11 +266,11 @@ const getReviews = async (productId, page = 1) => {
 ```javascript
 const uploadBlogImage = async (file) => {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
 
   // Use Supabase storage (handled by backend)
-  const response = await api.post('/blog-posts/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+  const response = await api.post("/blog-posts/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
   });
 
   return response.data.url; // Supabase public URL
@@ -282,13 +282,13 @@ const uploadBlogImage = async (file) => {
 ```javascript
 const uploadProductImages = async (files) => {
   const formData = new FormData();
-  
+
   files.forEach((file) => {
-    formData.append('images', file);
+    formData.append("images", file);
   });
 
-  const { data } = await api.post('/products/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+  const { data } = await api.post("/products/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
   });
 
   return data.urls; // Array of Supabase URLs
@@ -301,10 +301,9 @@ const uploadProductImages = async (files) => {
 
 ```javascript
 const addComment = async (postId, content) => {
-  const { data } = await api.post(
-    `/blog-posts/${postId}/comments`,
-    { content }
-  );
+  const { data } = await api.post(`/blog-posts/${postId}/comments`, {
+    content,
+  });
   return data.data.comment;
 };
 ```
@@ -327,10 +326,10 @@ const toggleLike = async (postId) => {
 
 ```javascript
 const searchPosts = async (query) => {
-  const { data } = await api.get('/blog-posts', {
+  const { data } = await api.get("/blog-posts", {
     params: {
       search: query,
-      status: 'published',
+      status: "published",
     },
   });
   return data.data.posts;
@@ -341,7 +340,7 @@ const searchPosts = async (query) => {
 
 ```javascript
 const getProductsByCategory = async (categorySlug) => {
-  const { data } = await api.get('/products', {
+  const { data } = await api.get("/products", {
     params: {
       category: categorySlug,
     },
@@ -356,9 +355,9 @@ const getProductsByCategory = async (categorySlug) => {
 
 ```jsx
 // frontend/src/pages/BlogList.jsx
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import api from '../utils/api';
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import api from "../utils/api";
 
 export const BlogList = () => {
   const [posts, setPosts] = useState([]);
@@ -367,7 +366,7 @@ export const BlogList = () => {
 
   useEffect(() => {
     const fetchPosts = async () => {
-      const { data } = await api.get('/blog-posts', {
+      const { data } = await api.get("/blog-posts", {
         params: { page, limit: 10 },
       });
       setPosts(data.data.posts);
@@ -386,7 +385,9 @@ export const BlogList = () => {
             <h2>{post.title}</h2>
           </Link>
           <p>{post.excerpt}</p>
-          <small>By {post.author.username} • {post.views} views</small>
+          <small>
+            By {post.author.username} • {post.views} views
+          </small>
         </article>
       ))}
       <div>Page {page}</div>
@@ -399,9 +400,9 @@ export const BlogList = () => {
 
 ```jsx
 // frontend/src/pages/BlogPost.jsx
-import { useParams } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import api from '../utils/api';
+import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import api from "../utils/api";
 
 export const BlogPost = () => {
   const { slug } = useParams(); // Get slug from URL
@@ -420,13 +421,13 @@ export const BlogPost = () => {
 
   return (
     <article>
-      {post.featuredImage && (
-        <img src={post.featuredImage} alt={post.title} />
-      )}
+      {post.featuredImage && <img src={post.featuredImage} alt={post.title} />}
       <h1>{post.title}</h1>
-      <p>By {post.author.username} • {post.views} views</p>
+      <p>
+        By {post.author.username} • {post.views} views
+      </p>
       <div dangerouslySetInnerHTML={{ __html: post.content }} />
-      
+
       {/* Affiliate Disclosure */}
       <div className="affiliate-note">
         <p>⚠️ This page contains affiliate links. We may earn a commission.</p>
@@ -439,17 +440,17 @@ export const BlogPost = () => {
 ## 🛑 Error Handling
 
 ```javascript
-import api from '../utils/api';
+import api from "../utils/api";
 
 try {
-  const { data } = await api.get('/blog-posts/invalid-slug');
+  const { data } = await api.get("/blog-posts/invalid-slug");
 } catch (error) {
   if (error.response?.status === 404) {
-    console.error('Post not found');
+    console.error("Post not found");
   } else if (error.response?.status === 401) {
-    console.error('Unauthorized - login required');
+    console.error("Unauthorized - login required");
   } else {
-    console.error('Server error:', error.response?.data?.message);
+    console.error("Server error:", error.response?.data?.message);
   }
 }
 ```
@@ -457,6 +458,7 @@ try {
 ## 📋 API Response Format
 
 ### Success Response
+
 ```json
 {
   "success": true,
@@ -467,6 +469,7 @@ try {
 ```
 
 ### Error Response
+
 ```json
 {
   "success": false,

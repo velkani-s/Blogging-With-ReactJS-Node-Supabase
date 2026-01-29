@@ -19,9 +19,9 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/blogs" element={<BlogList />} />
-              <Route path="/blogs/:id" element={<BlogPost />} />
+              <Route path="/blogs/:slug" element={<BlogPost />} />
               <Route path="/products" element={<ProductList />} />
-              <Route path="/products/:id" element={<ProductPage />} />
+              <Route path="/products/:slug" element={<ProductPage />} />
               <Route path="/admin" element={<AdminPanel />} />
             </Routes>
           </main>

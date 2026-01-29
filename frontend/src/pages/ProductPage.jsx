@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import axios from "axios";
+import api from "../utils/api";
 
 const ProductPage = () => {
-  const { id } = useParams();
+  const { slug } = useParams();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const response = await axios.get(`/api/products/${id}`);
+        const response = await api.get(`/products/${slug}`);
         setProduct(response.data);
       } catch (error) {
         console.error("Error fetching product:", error);
@@ -20,7 +20,7 @@ const ProductPage = () => {
       }
     };
     fetchProduct();
-  }, [id]);
+  }, [slug]);
 
   if (loading)
     return <div className="container mx-auto px-4 py-8">Loading...</div>;
